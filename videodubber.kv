@@ -1,21 +1,34 @@
 <VideoListItem>:
     orientation: 'horizontal'
     size_hint_y: None
-    height: 40
+    height: 50
+    padding: 5, 2
+
     canvas.before:
         Color:
-            rgba: (0.2, 0.6, 0.8, 1) if self.selected else (0.9, 0.9, 0.9, 1)
+            rgba: (0.2, 0.6, 1.0, 1) if self.selected else (0.95, 0.95, 0.95, 1)
         Rectangle:
             pos: self.pos
             size: self.size
-    Label:
-        text: root.video_name if root.video_name else '空'
-        size_hint_x: 0.8
-        halign: 'left'
-        text_size: self.size
-        valign: 'middle'
-    Label:
-        text: '选择' if not root.selected else '已选'
-        size_hint_x: 0.2
-        halign: 'center'
-        valign: 'middle'
+
+    BoxLayout:
+        orientation: 'horizontal'
+        spacing: 5
+
+        Label:
+            text: root.video_name if root.video_name else 'Video'
+            size_hint_x: 0.85
+            halign: 'left'
+            valign: 'middle'
+            text_size: self.size
+            color: (0, 0, 0, 1)
+
+        BoxLayout:
+            size_hint_x: 0.15
+            orientation: 'vertical'
+
+            Button:
+                text: 'Play'
+                size_hint_y: None
+                height: 40
+                on_press: app.root.select_video(root.index)
