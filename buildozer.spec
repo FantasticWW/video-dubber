@@ -29,7 +29,7 @@ requirements = python3,kivy,plyer,android
 #icon.filename = %(source.dir)s/icon.png
 
 # (str) Supported orientation (landscape, portrait or all)
-orientation = all
+orientation = sensor
 
 # (bool) Indicate if the application should be fullscreen or not
 fullscreen = 0
