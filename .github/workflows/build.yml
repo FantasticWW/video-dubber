@@ -8,15 +8,24 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: ArtemSBulgakov/buildozer-action@v1
-        id: buildozer
-        with:
-          workdir: .
-          buildozer_version: stable
-          command: android debug
-      - uses: actions/upload-artifact@v4
-        with:
-          name: video-dubber-apk
-          path: ${{ steps.buildozer.outputs.filename }}
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Build APK with Buildozer
+      run: |
+        docker run --rm -v "$PWD":/home/user/hostcwd -v ~/.buildozer:/home/user/.buildozer \
+          kivy/buildozer android debug
+
+    - name: Find APK file
+      run: |
+        echo "apk_file=$(ls bin/*.apk 2>/dev/null || echo '')" >> $GITHUB_OUTPUT
+      id: find_apk
+
+    - name: Upload APK artifact
+      if: steps.find_apk.outputs.apk_file != ''
+      uses: actions/upload-artifact@v4
+      with:
+        name: video-dubber-apk
+        path: bin/*.apk
