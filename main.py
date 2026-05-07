@@ -297,6 +297,38 @@ class VideoDubberApp(App):
             Logger.error(f"Play audio error: {e}")
             self.status_label.text = 'Failed to play audio'
 
+    def merge_audio_with_video(self, video_path, audio_path, output_path):
+        """Use FFmpeg to replace video audio track with recorded audio"""
+        try:
+            import subprocess
+            Logger.info(f"FFmpeg merge: video={video_path}, audio={audio_path}, output={output_path}")
+
+            cmd = [
+                'ffmpeg',
+                '-i', video_path,
+                '-i', audio_path,
+                '-c:v', 'copy',
+                '-c:a', 'aac',
+                '-map', '0:v',
+                '-map', '1:a',
+                '-shortest',
+                '-y',
+                output_path
+            ]
+
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+            Logger.info(f"FFmpeg return code: {result.returncode}")
+            if result.stderr:
+                Logger.info(f"FFmpeg stderr: {result.stderr[:500]}")
+
+            return result.returncode == 0
+        except subprocess.TimeoutExpired:
+            Logger.error("FFmpeg merge timeout")
+            return False
+        except Exception as e:
+            Logger.error(f"FFmpeg merge error: {e}")
+            return False
+
     def save_dubbed_video(self, instance):
         if self.current_video_index < 0:
             self.status_label.text = 'Please select a video first'
@@ -306,7 +338,24 @@ class VideoDubberApp(App):
             self.status_label.text = 'Please record dub first'
             return
 
-        self.status_label.text = f'Dub saved: {self.current_audio_path}'
+        video = self.video_list[self.current_video_index]
+        video_path = video['path']
+
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        output_path = os.path.join(
+            self.get_storage_path(),
+            f'dubbed_{timestamp}.mp4'
+        )
+
+        self.status_label.text = 'Merging audio with video...'
+
+        success = self.merge_audio_with_video(video_path, self.current_audio_path, output_path)
+
+        if success and os.path.exists(output_path):
+            self.status_label.text = f'Saved: {os.path.basename(output_path)}'
+            self.add_video_to_list(output_path)
+        else:
+            self.status_label.text = 'Failed to merge video'
 
     def get_storage_path(self):
         try:
