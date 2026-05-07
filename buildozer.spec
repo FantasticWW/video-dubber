@@ -20,7 +20,8 @@ version = 1.0.0
 
 # (list) Application requirements
 # comma separated e.g. requirements = sqlite3,kivy
-requirements = python3,kivy,plyer,android,ffmpeg
+# IMPORTANT: gst-provider is needed for Kivy Video widget to work on Android
+requirements = python3,kivy,plyer,android,ffmpeg,gst-provider
 
 # (str) Presplash of the application
 #presplash.filename = %(source.dir)s/presplash.png

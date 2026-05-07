@@ -196,31 +196,46 @@ class VideoDubberApp(App):
 
             Logger.info(f"Attempting to copy video from URI to: {local_path}")
 
+            # Ensure storage directory exists
+            storage_path = self.get_storage_path()
+            if not os.path.exists(storage_path):
+                os.makedirs(storage_path)
+                Logger.info(f"Created storage directory: {storage_path}")
+
             # Use Android's ContentResolver to open and copy
             content_resolver = mActivity.getContentResolver()
             input_stream = content_resolver.openInputStream(uri)
 
             if input_stream:
-                # Use Python file operations instead of Java FileOutputStream
-                with open(local_path, 'wb') as output_file:
-                    # Read chunks from Java InputStream
-                    chunk_size = 8192
-                    total_bytes = 0
-                    while True:
-                        # Create a Java byte array for reading
-                        buffer = bytearray(chunk_size)
-                        read_bytes = input_stream.read(buffer)
-                        if read_bytes <= 0:
-                            break
-                        # Write the actual bytes read to Python file
-                        output_file.write(buffer[:read_bytes])
-                        total_bytes += read_bytes
+                # Import Java classes for efficient copying
+                from jnius import autoclass
+                BufferedInputStream = autoclass('java.io.BufferedInputStream')
+                FileOutputStream = autoclass('java.io.FileOutputStream')
 
+                # Wrap input stream with buffered stream for efficiency
+                buffered_input = BufferedInputStream(input_stream)
+                output_stream = FileOutputStream(local_path)
+
+                # Create Java byte array buffer
+                ByteArray = autoclass('[B')  # byte array type
+                buffer = ByteArray(8192)
+
+                total_bytes = 0
+                while True:
+                    read_bytes = buffered_input.read(buffer)
+                    if read_bytes <= 0:
+                        break
+                    output_stream.write(buffer, 0, read_bytes)
+                    total_bytes += read_bytes
+
+                buffered_input.close()
                 input_stream.close()
-                Logger.info(f"Video copied successfully: {local_path}, size: {total_bytes} bytes")
+                output_stream.close()
+                Logger.info(f"Video copied successfully: {local_path}, total bytes: {total_bytes}")
 
                 # Verify file was created and has content
                 if os.path.exists(local_path) and os.path.getsize(local_path) > 0:
+                    Logger.info(f"File verified, size: {os.path.getsize(local_path)} bytes")
                     return local_path
                 else:
                     Logger.error("Copied file is empty or doesn't exist")
@@ -239,7 +254,7 @@ class VideoDubberApp(App):
                         return path
                 cursor.close()
 
-            # Last fallback: return URI string
+            # Last fallback: return URI string (may not work for playback)
             uri_string = uri.toString()
             Logger.warning(f"Using URI string as fallback: {uri_string}")
             return uri_string
