@@ -190,6 +190,31 @@ class VideoDubberApp(App):
 
     def get_real_path_from_uri(self, uri):
         try:
+            # Try to copy content to local file for reliable playback
+            import shutil
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            local_path = os.path.join(self.get_storage_path(), f'video_{timestamp}.mp4')
+
+            # Use Android's ContentResolver to open and copy
+            input_stream = mActivity.getContentResolver().openInputStream(uri)
+            if input_stream:
+                # Read and write to local file
+                import java.io.FileOutputStream as FileOutputStream
+                output_stream = FileOutputStream(local_path)
+
+                buffer = bytearray(8192)
+                while True:
+                    read_bytes = input_stream.read(buffer)
+                    if read_bytes <= 0:
+                        break
+                    output_stream.write(buffer, 0, read_bytes)
+
+                input_stream.close()
+                output_stream.close()
+                Logger.info(f"Video copied to: {local_path}")
+                return local_path
+
+            # Fallback: try to get path from cursor
             cursor = mActivity.getContentResolver().query(uri, None, None, None, None)
             if cursor:
                 cursor.moveToFirst()
@@ -197,12 +222,18 @@ class VideoDubberApp(App):
                 if path_index >= 0:
                     path = cursor.getString(path_index)
                     cursor.close()
-                    return path
+                    if path and os.path.exists(path):
+                        return path
                 cursor.close()
+
             return uri.toString()
         except Exception as e:
             Logger.error(f"Get path from uri error: {e}")
-            return uri.toString() if uri else None
+            try:
+                # Simple fallback: return URI string
+                return uri.toString()
+            except:
+                return None
 
     def add_video_to_list(self, path):
         try:
