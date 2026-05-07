@@ -191,31 +191,43 @@ class VideoDubberApp(App):
     def get_real_path_from_uri(self, uri):
         try:
             # Try to copy content to local file for reliable playback
-            import shutil
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             local_path = os.path.join(self.get_storage_path(), f'video_{timestamp}.mp4')
 
-            # Use Android's ContentResolver to open and copy
-            input_stream = mActivity.getContentResolver().openInputStream(uri)
-            if input_stream:
-                # Read and write to local file
-                import java.io.FileOutputStream as FileOutputStream
-                output_stream = FileOutputStream(local_path)
+            Logger.info(f"Attempting to copy video from URI to: {local_path}")
 
-                buffer = bytearray(8192)
-                while True:
-                    read_bytes = input_stream.read(buffer)
-                    if read_bytes <= 0:
-                        break
-                    output_stream.write(buffer, 0, read_bytes)
+            # Use Android's ContentResolver to open and copy
+            content_resolver = mActivity.getContentResolver()
+            input_stream = content_resolver.openInputStream(uri)
+
+            if input_stream:
+                # Use Python file operations instead of Java FileOutputStream
+                with open(local_path, 'wb') as output_file:
+                    # Read chunks from Java InputStream
+                    chunk_size = 8192
+                    total_bytes = 0
+                    while True:
+                        # Create a Java byte array for reading
+                        buffer = bytearray(chunk_size)
+                        read_bytes = input_stream.read(buffer)
+                        if read_bytes <= 0:
+                            break
+                        # Write the actual bytes read to Python file
+                        output_file.write(buffer[:read_bytes])
+                        total_bytes += read_bytes
 
                 input_stream.close()
-                output_stream.close()
-                Logger.info(f"Video copied to: {local_path}")
-                return local_path
+                Logger.info(f"Video copied successfully: {local_path}, size: {total_bytes} bytes")
+
+                # Verify file was created and has content
+                if os.path.exists(local_path) and os.path.getsize(local_path) > 0:
+                    return local_path
+                else:
+                    Logger.error("Copied file is empty or doesn't exist")
+                    return None
 
             # Fallback: try to get path from cursor
-            cursor = mActivity.getContentResolver().query(uri, None, None, None, None)
+            cursor = content_resolver.query(uri, None, None, None, None)
             if cursor:
                 cursor.moveToFirst()
                 path_index = cursor.getColumnIndex('_data')
@@ -223,14 +235,19 @@ class VideoDubberApp(App):
                     path = cursor.getString(path_index)
                     cursor.close()
                     if path and os.path.exists(path):
+                        Logger.info(f"Got path from cursor: {path}")
                         return path
                 cursor.close()
 
-            return uri.toString()
+            # Last fallback: return URI string
+            uri_string = uri.toString()
+            Logger.warning(f"Using URI string as fallback: {uri_string}")
+            return uri_string
         except Exception as e:
             Logger.error(f"Get path from uri error: {e}")
+            import traceback
+            Logger.error(traceback.format_exc())
             try:
-                # Simple fallback: return URI string
                 return uri.toString()
             except:
                 return None
