@@ -19,17 +19,32 @@ import json
 from datetime import datetime
 
 try:
-    from android import mActivity
-    from android.permissions import request_permissions, Permission
-    from android.activity import bind_activity_result
     from jnius import autoclass
     IS_ANDROID = True
-    Logger.info("Running on Android platform")
+    Logger.info("Running on Android platform - jnius available")
 
+    PythonActivity = autoclass('org.kivy.android.PythonActivity')
+    mActivity = PythonActivity.mActivity
     Intent = autoclass('android.content.Intent')
     Uri = autoclass('android.net.Uri')
+
+    try:
+        from android.permissions import request_permissions, Permission
+        HAS_PERMISSIONS = True
+    except ImportError:
+        HAS_PERMISSIONS = False
+        Logger.warning("android.permissions not available")
+
+    try:
+        from android.activity import bind_activity_result
+        HAS_ACTIVITY_RESULT = True
+    except ImportError:
+        HAS_ACTIVITY_RESULT = False
+        Logger.warning("android.activity.bind_activity_result not available")
 except ImportError:
     IS_ANDROID = False
+    HAS_PERMISSIONS = False
+    HAS_ACTIVITY_RESULT = False
     Logger.info("Not running on Android platform")
 
 try:
@@ -126,6 +141,10 @@ class VideoDubberApp(App):
         return root
 
     def request_android_permissions(self, dt):
+        if not IS_ANDROID or not HAS_PERMISSIONS:
+            Logger.info("Permissions not available on this platform")
+            self.permissions_granted = True
+            return
         try:
             permissions = [
                 Permission.READ_EXTERNAL_STORAGE,
@@ -136,6 +155,7 @@ class VideoDubberApp(App):
             Logger.info("Permission request sent")
         except Exception as e:
             Logger.error(f"Permission request error: {e}")
+            self.permissions_granted = True
 
     def on_permissions_result(self, permissions, results):
         Logger.info(f"Permissions result: {permissions}, {results}")
@@ -147,7 +167,8 @@ class VideoDubberApp(App):
                 intent = Intent(Intent.ACTION_GET_CONTENT)
                 intent.setType('video/*')
                 intent.addCategory(Intent.CATEGORY_OPENABLE)
-                bind_activity_result(self.on_activity_result)
+                if HAS_ACTIVITY_RESULT:
+                    bind_activity_result(self.on_activity_result)
                 mActivity.startActivityForResult(intent, self.REQUEST_CODE_PICK_VIDEO)
                 self.status_label.text = 'Select a video file...'
             except Exception as e:
